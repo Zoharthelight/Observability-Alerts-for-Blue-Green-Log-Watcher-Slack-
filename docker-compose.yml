@@ -1,0 +1,72 @@
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: nginx_proxy
+    ports:
+      - "8080:80"
+    volumes:
+      - type: bind
+        source: ./nginx/nginx.conf.template
+        target: /etc/nginx/nginx.conf
+        read_only: true
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - app_blue
+      - app_green
+    networks:
+      - app_network
+    restart: unless-stopped
+
+  app_blue:
+    image: ${BLUE_IMAGE}
+    container_name: app_blue
+    ports:
+      - "8081:3000"
+    environment:
+      - APP_POOL=blue
+      - RELEASE_ID=${RELEASE_ID_BLUE}
+      - PORT=${PORT:-3000}
+    networks:
+      - app_network
+    restart: unless-stopped
+
+  app_green:
+    image: ${GREEN_IMAGE}
+    container_name: app_green
+    ports:
+      - "8082:3000"
+    environment:
+      - APP_POOL=green
+      - RELEASE_ID=${RELEASE_ID_GREEN}
+      - PORT=${PORT:-3000}
+    networks:
+      - app_network
+    restart: unless-stopped
+
+  alert_watcher:
+    image: python:3.11-slim
+    container_name: alert_watcher
+    volumes:
+      - ./watcher.py:/app/watcher.py:ro
+      - ./requirements.txt:/app/requirements.txt:ro
+      - nginx_logs:/var/log/nginx:ro
+    environment:
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - ERROR_RATE_THRESHOLD=${ERROR_RATE_THRESHOLD:-2}
+      - WINDOW_SIZE=${WINDOW_SIZE:-200}
+      - ALERT_COOLDOWN_SEC=${ALERT_COOLDOWN_SEC:-300}
+      - MAINTENANCE_MODE=${MAINTENANCE_MODE:-false}
+    working_dir: /app
+    command: sh -c "pip install -q -r requirements.txt && python -u watcher.py"
+    depends_on:
+      - nginx
+    restart: unless-stopped
+
+
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  nginx_logs:
