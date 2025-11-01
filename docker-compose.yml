@@ -5,10 +5,7 @@ services:
     ports:
       - "8080:80"
     volumes:
-      - type: bind
-        source: ./nginx/nginx.conf.template
-        target: /etc/nginx/nginx.conf
-        read_only: true
+      - ./nginx/nginx.conf.template:/etc/nginx/nginx.conf:ro
       - nginx_logs:/var/log/nginx
     depends_on:
       - app_blue
@@ -16,6 +13,7 @@ services:
     networks:
       - app_network
     restart: unless-stopped
+
 
   app_blue:
     image: ${BLUE_IMAGE}
